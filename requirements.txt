@@ -1,0 +1,8 @@
+streamlit
+audio-recorder-streamlit
+numpy
+scipy
+soundfile
+librosa
+pydub
+faster-whisper
