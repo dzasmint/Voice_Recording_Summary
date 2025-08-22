@@ -4,69 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Voice Recording Summary is a new project in the Dragon Capital AI ecosystem for transcribing and summarizing audio recordings. This project is currently in initial setup phase.
-
-## Project Context
-
-This project is part of a larger AI/ML ecosystem at Dragon Capital that includes:
-- Company_Dashboard: Streamlit-based financial analysis dashboard
-- Real_Estate_Financial_Model_Forecast: Real estate forecasting application
+Voice Recording Summary is a Vietnamese speech-to-text transcription application built with Streamlit, using PhoWhisper-large model optimized with Faster-Whisper (CTranslate2) for real-time audio transcription.
 
 ## Development Commands
 
-Since this is a new project, typical Python/Streamlit commands should be used:
-
 ```bash
-# Install dependencies (once requirements.txt is created)
+# Install dependencies
 pip install -r requirements.txt
 
-# Run the application (once app.py is created)
+# Install PhoWhisper if needed
+pip install git+https://github.com/VinAIResearch/PhoWhisper.git
+
+# Run the application
 streamlit run app.py
 
-# Python linting (if configured)
-python -m flake8 .
+# Python formatting (if configured)
 python -m black .
-
-# Run tests (if implemented)
-pytest tests/
+python -m flake8 .
 ```
 
-## Architecture Guidelines
+## Architecture
 
-When implementing features in this voice recording summary application:
+The application consists of two main modules:
 
-1. **Follow Modular Structure**: Separate concerns into distinct modules:
-   - `core/audio_processor.py` for audio file handling
-   - `core/transcription.py` for speech-to-text
-   - `core/summarization.py` for text summarization
-   - `utils/` for helper functions
+1. **app.py**: Streamlit UI application that handles:
+   - Audio input via microphone recording (audio-recorder-streamlit) or file upload
+   - Model loading with caching (@st.cache_resource)
+   - Progress tracking during transcription
+   - Results display with timestamps and download options
 
-2. **Technology Stack**: Use Python with Streamlit for consistency with other Dragon Capital projects. Consider:
-   - OpenAI Whisper or similar for transcription
-   - LLMs (OpenAI GPT, Claude) for summarization
-   - Audio libraries like pydub or librosa for processing
+2. **audio_transcriber.py**: Core transcription module containing `FasterWhisperTranscriber` class that:
+   - Loads PhoWhisper-large-ct2 model from HuggingFace (kiendt/PhoWhisper-large-ct2)
+   - Auto-detects CUDA availability for GPU acceleration
+   - Implements VAD (Voice Activity Detection) for better accuracy
+   - Provides methods for transcription with/without timestamps and language detection
 
-3. **Configuration Management**: Store sensitive data (API keys) in environment variables or config files (never commit these)
+## Key Implementation Details
 
-4. **UI Patterns**: Follow Streamlit patterns from Company_Dashboard project in the parent directory
+- **Model**: Uses PhoWhisper-large-ct2, a Vietnamese-optimized Whisper model converted to CTranslate2 format
+- **Device Selection**: Automatically uses CUDA if available, falls back to CPU with optimized compute types
+- **Audio Processing**: Handles multiple formats (WAV, MP3, M4A, AAC, OGG) with format detection
+- **Progress Tracking**: Real-time progress updates during transcription with time estimation
+- **Session State**: Uses Streamlit session state to persist transcription results across interactions
 
-5. **Error Handling**: Implement robust error handling for:
-   - File upload validation
-   - API rate limits
-   - Audio format compatibility
-   - Network failures
+## Critical Paths
 
-## Key Implementation Considerations
+- Model loading: `load_model()` → `FasterWhisperTranscriber.__init__()` → `WhisperModel()`
+- Transcription flow: Audio input → `save_audio_file()` → `transcriber.transcribe()` → Display results
+- Audio formats detected via magic bytes in `save_audio_file()`
 
-- **Audio Format Support**: Support common formats (mp3, wav, m4a, etc.)
-- **File Size Limits**: Implement appropriate limits for audio uploads
-- **Progress Indicators**: Show progress for long-running operations (transcription, summarization)
-- **Export Options**: Allow users to export summaries in various formats
-- **Session Management**: Use Streamlit session state for user data persistence
+## Dependencies
 
-## Integration Points
-
-When integrating with existing Dragon Capital systems:
-- Follow the configuration patterns from Company_Dashboard
-- Use similar utility function structures
-- Maintain consistent error handling and logging approaches
+Core dependencies from requirements.txt:
+- streamlit: Web UI framework
+- audio-recorder-streamlit: Browser microphone recording
+- faster-whisper: Optimized Whisper inference
+- librosa: Audio duration extraction
+- soundfile, scipy, numpy: Audio processing

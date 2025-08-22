@@ -6,3 +6,4 @@ soundfile
 librosa
 pydub
 faster-whisper
+torch>=2.0.0

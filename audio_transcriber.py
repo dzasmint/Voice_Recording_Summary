@@ -17,8 +17,12 @@ class FasterWhisperTranscriber:
         self.model_size = model_size
         
         if device == "auto":
-            import torch
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            try:
+                import torch
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            except ImportError:
+                print("PyTorch not installed. Using CPU for inference.")
+                self.device = "cpu"
         else:
             self.device = device
         
