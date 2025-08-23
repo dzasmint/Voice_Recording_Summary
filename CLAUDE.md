@@ -23,9 +23,25 @@ python -m black .
 python -m flake8 .
 ```
 
+## Available Models
+
+The application now supports multiple PhoWhisper models:
+
+1. **PhoWhisper-small** (Default)
+   - Repository: qbsmlabs/PhoWhisper-small
+   - Size: 39M parameters
+   - Performance: 5-10x faster than large model
+   - Best for: Real-time transcription, low-resource devices
+
+2. **PhoWhisper-large-ct2**
+   - Repository: kiendt/PhoWhisper-large-ct2
+   - Size: 1.5B parameters
+   - Performance: Highest accuracy, slower inference
+   - Best for: High-quality transcription, batch processing
+
 ## Architecture
 
-The application consists of two main modules:
+The application consists of several main modules:
 
 1. **app.py**: Streamlit UI application that handles:
    - Audio input via microphone recording (audio-recorder-streamlit) or file upload
@@ -41,7 +57,8 @@ The application consists of two main modules:
 
 ## Key Implementation Details
 
-- **Model**: Uses PhoWhisper-large-ct2, a Vietnamese-optimized Whisper model converted to CTranslate2 format
+- **Models**: Supports both PhoWhisper-small (default, fast) and PhoWhisper-large-ct2 (accurate)
+- **Model Selection**: Users can choose models via sidebar dropdown
 - **Device Selection**: Automatically uses CUDA if available, falls back to CPU with optimized compute types
 - **Audio Processing**: Handles multiple formats (WAV, MP3, M4A, AAC, OGG) with format detection
 - **Progress Tracking**: Real-time progress updates during transcription with time estimation

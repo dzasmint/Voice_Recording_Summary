@@ -3,8 +3,10 @@ audio-recorder-streamlit
 numpy
 scipy
 soundfile
+sounddevice
 librosa>=0.10.0
 pydub
 faster-whisper
 torch>=2.0.0
 numba>=0.57.0
+pyaudio
