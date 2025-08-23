@@ -3,7 +3,7 @@ import tempfile
 import os
 from audio_recorder_streamlit import audio_recorder
 from audio_transcriber import FasterWhisperTranscriber
-from live_transcription import create_live_transcription_ui
+from live_transcription_cloud import create_live_transcription_wrapper
 
 st.set_page_config(
     page_title="Live Audio Transcription - PhoWhisper",
@@ -378,8 +378,8 @@ def main():
             key="live_language"
         )
         
-        # Create live transcription UI
-        create_live_transcription_ui(transcriber, language=language)
+        # Create live transcription UI (automatically detects cloud vs local)
+        create_live_transcription_wrapper(transcriber, language=language)
     
     with st.sidebar:
         st.markdown("### ℹ️ Information")
