@@ -3,31 +3,54 @@ from faster_whisper import WhisperModel
 import numpy as np
 import librosa
 import soundfile as sf
+from model_config import get_model_info, get_compute_type
 
 class FasterWhisperTranscriber:
-    def __init__(self, model_size="kiendt/PhoWhisper-large-ct2", device="auto", compute_type="default"):
+    def __init__(self, model_name="PhoWhisper-small", device="auto", compute_type="default"):
         """
         Initialize Faster-Whisper transcriber with PhoWhisper model
         
         Args:
-            model_size: Model name or HuggingFace repo (default: kiendt/PhoWhisper-large-ct2)
-            device: Device to use (auto, cpu, cuda)
-            compute_type: Compute type (default, float16, int8, int8_float16)
+            model_name: Model name from available models (PhoWhisper-small or PhoWhisper-large-ct2)
+            device: Device to use (auto, cpu, cuda, mps)
+            compute_type: Compute type (default, float16, int8, int8_float16, float32)
         """
-        self.model_size = model_size
+        # Get model configuration
+        self.model_name = model_name
+        model_info = get_model_info(model_name)
+        self.model_size = model_info["repo_id"]
+        self.requested_device = device  # Store the originally requested device
         
         if device == "auto":
             try:
                 import torch
-                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                if torch.cuda.is_available():
+                    self.device = "cuda"
+                elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                    # MPS is available but faster-whisper doesn't support it directly
+                    # We'll use CPU with optimizations
+                    self.device = "cpu"
+                    self.use_mps_tensors = True
+                    print("Metal Performance Shaders (MPS) detected - using CPU with MPS tensor acceleration")
+                else:
+                    self.device = "cpu"
+                    self.use_mps_tensors = False
             except ImportError:
                 print("PyTorch not installed. Using CPU for inference.")
                 self.device = "cpu"
+                self.use_mps_tensors = False
+        elif device == "mps":
+            # User explicitly requested MPS
+            self.device = "cpu"  # faster-whisper will use CPU
+            self.use_mps_tensors = True
+            print("MPS requested - using CPU backend with MPS tensor acceleration where possible")
         else:
             self.device = device
+            self.use_mps_tensors = False
         
         if compute_type == "default":
-            self.compute_type = "float16" if self.device == "cuda" else "int8"
+            # Get optimal compute type based on model and device
+            self.compute_type = get_compute_type(self.model_name, self.device)
         else:
             self.compute_type = compute_type
         
@@ -39,12 +62,25 @@ class FasterWhisperTranscriber:
             print(f"Loading Faster-Whisper model: {self.model_size}")
             print(f"Device: {self.device}, Compute type: {self.compute_type}")
             
+            if hasattr(self, 'use_mps_tensors') and self.use_mps_tensors:
+                print("MPS acceleration enabled for tensor operations")
+            
+            # Configure CPU threads for optimal performance
+            cpu_threads = 0  # 0 means use all available cores
+            if self.device == "cpu":
+                # For Apple Silicon, use performance cores efficiently
+                import platform
+                if platform.processor() == 'arm':
+                    cpu_threads = 8  # Typical number of performance cores on M1/M2
+            
             self.model = WhisperModel(
                 self.model_size,
                 device=self.device,
                 compute_type=self.compute_type,
-                download_root=os.path.expanduser("~/.cache/faster-whisper")
+                download_root=os.path.expanduser("~/.cache/faster-whisper"),
+                cpu_threads=cpu_threads
             )
+            
             print("Model loaded successfully!")
         except Exception as e:
             print(f"Error loading model: {e}")

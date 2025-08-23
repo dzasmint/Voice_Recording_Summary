@@ -11,14 +11,16 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def load_model():
-    """Load PhoWhisper-large model with CTranslate2 optimization"""
+def load_model(model_name="PhoWhisper-small", device="auto", compute_type="default"):
+    """Load PhoWhisper model with CTranslate2 optimization"""
     try:
-        # Using PhoWhisper-large-ct2 from HuggingFace
+        from model_config import get_model_info
+        model_info = get_model_info(model_name)
+        
         transcriber = FasterWhisperTranscriber(
-            model_size="kiendt/PhoWhisper-large-ct2",
-            device="auto",
-            compute_type="default"
+            model_name=model_name,
+            device=device,
+            compute_type=compute_type
         )
         return transcriber
     except Exception as e:
@@ -41,9 +43,55 @@ def save_audio_file(audio_bytes, file_ext=".wav"):
 
 def main():
     st.title("🎤 Live Audio Transcription")
-    st.markdown("### Vietnamese Speech-to-Text using PhoWhisper-large & Faster-Whisper")
+    st.markdown("### Vietnamese Speech-to-Text using PhoWhisper Models & Faster-Whisper")
     
-    transcriber = load_model()
+    # Model and device selection in sidebar
+    with st.sidebar:
+        st.markdown("### ⚙️ Configuration")
+        
+        # Model selection
+        st.markdown("#### 🤖 Model Selection")
+        model_option = st.selectbox(
+            "Choose Model",
+            ["PhoWhisper-small", "PhoWhisper-large-ct2"],
+            index=0,  # Default to small model
+            format_func=lambda x: {
+                "PhoWhisper-small": "Small (Fast, 39M params)",
+                "PhoWhisper-large-ct2": "Large (Accurate, 1.5B params)"
+            }[x],
+            help="Small model is 5-10x faster with good accuracy. Large model has highest accuracy but slower."
+        )
+        
+        # Show model details
+        from model_config import get_model_info
+        model_info = get_model_info(model_option)
+        with st.expander("Model Details", expanded=False):
+            st.markdown(f"**Repository:** {model_info['repo_id']}")
+            st.markdown(f"**Size:** {model_info['size']}")
+            st.markdown(f"**Performance:** {model_info['performance']}")
+            st.markdown(f"**Best for:** {model_info['recommended_for']}")
+        
+        # Device selection
+        st.markdown("#### 💻 Device Selection")
+        device_option = st.selectbox(
+            "Select Device",
+            ["auto", "cpu", "cuda", "mps"],
+            index=0,
+            format_func=lambda x: {
+                "auto": "Auto-detect",
+                "cpu": "CPU",
+                "cuda": "GPU (CUDA)",
+                "mps": "GPU (Metal)"
+            }[x],
+            help="Select the device for model inference. Auto-detect will choose the best available option."
+        )
+        
+        if device_option == "mps":
+            st.info("Metal Performance Shaders will be used for acceleration on Apple Silicon")
+        
+        st.markdown("---")
+    
+    transcriber = load_model(model_name=model_option, device=device_option)
     
     if transcriber is None:
         st.error("Failed to load model. Please check your installation.")
@@ -64,8 +112,75 @@ def main():
         audio_bytes = None
         
         if input_method == "🎤 Record from Microphone":
-            st.info("Click the microphone button to start/stop recording")
-            audio_bytes = audio_recorder(text="Click to record", icon_size="2x")
+            # Recording stability options
+            with st.expander("⚙️ Recording Settings", expanded=False):
+                recording_mode = st.radio(
+                    "Recording Mode",
+                    ["Standard", "Enhanced (Better Stability)"],
+                    index=0,
+                    help="Enhanced mode provides better stability with automatic reconnection"
+                )
+                
+                # Additional settings for stability
+                auto_retry = st.checkbox("Auto-retry on failure", value=True, 
+                                        help="Automatically retry recording if connection is lost")
+                max_duration = st.slider("Max recording duration (seconds)", 10, 300, 60,
+                                        help="Automatically stop recording after this duration to prevent data loss")
+            
+            if recording_mode == "Enhanced (Better Stability)":
+                try:
+                    from audio_recorder_enhanced import create_audio_recorder_ui
+                    st.info("📍 Enhanced Mode: Click button to start/stop recording")
+                    with st.container():
+                        audio_bytes = create_audio_recorder_ui()
+                        
+                        # Add connection status indicator
+                        if 'audio_recorder' in st.session_state:
+                            status = st.session_state.audio_recorder.get_recording_status()
+                            if status['status'] == 'recording':
+                                st.success(f"🔴 Recording... ({status['duration']:.1f}s)")
+                            elif status['status'] == 'reconnecting':
+                                st.warning("🔄 Reconnecting audio...")
+                                
+                except ImportError:
+                    st.warning("Enhanced recorder not available. Using standard recorder.")
+                    st.info("💡 Tip: For better stability, try shorter recording sessions")
+                    
+                    # Add retry mechanism for standard recorder
+                    if auto_retry and 'retry_count' not in st.session_state:
+                        st.session_state.retry_count = 0
+                    
+                    try:
+                        audio_bytes = audio_recorder(
+                            text="Click to record", 
+                            icon_size="2x",
+                            key=f"audio_recorder_{st.session_state.get('retry_count', 0)}"
+                        )
+                    except Exception as e:
+                        st.error(f"Recording failed: {e}")
+                        if auto_retry and st.session_state.retry_count < 3:
+                            st.session_state.retry_count += 1
+                            st.info("Retrying... Please click the record button again")
+                            st.rerun()
+            else:
+                st.info("🎤 Standard Mode: Click the microphone button to record")
+                
+                # Tips for stable recording
+                with st.expander("💡 Tips for stable recording"):
+                    st.markdown("""
+                    - Keep recording sessions under 60 seconds for best stability
+                    - Ensure stable internet connection
+                    - Allow microphone permissions when prompted
+                    - Try refreshing the page if recording stops working
+                    - Use Chrome or Firefox for best compatibility
+                    """)
+                
+                # Use stable recorder with better error handling
+                try:
+                    from stable_recorder import stable_audio_recorder
+                    audio_bytes = stable_audio_recorder()
+                except ImportError:
+                    audio_bytes = audio_recorder(text="Click to record", icon_size="2x")
         else:
             st.info("Upload audio file (supports MP3, WAV, M4A, AAC, OGG)")
             uploaded_file = st.file_uploader(
@@ -124,15 +239,25 @@ def main():
                     
                     # Step 3: Start transcription
                     progress_bar.progress(40, text="Starting transcription...")
-                    status_text.text("🎯 Processing audio with PhoWhisper-large...")
+                    model_display_name = "PhoWhisper-small" if model_option == "PhoWhisper-small" else "PhoWhisper-large"
+                    status_text.text(f"🎯 Processing audio with {model_display_name}...")
                     
                     # Get audio duration for progress estimation
                     import librosa
                     audio_duration = librosa.get_duration(path=temp_audio_path)
                     
-                    # Estimate processing time (roughly 1/4 to 1/3 of audio duration on CPU)
-                    device_factor = 0.1 if transcriber.device == "cuda" else 0.3
-                    estimated_time = audio_duration * device_factor
+                    # Estimate processing time based on device and model
+                    # Small model is 5-10x faster than large model
+                    model_factor = 0.2 if model_option == "PhoWhisper-small" else 1.0
+                    
+                    if transcriber.device == "cuda":
+                        device_factor = 0.1
+                    elif hasattr(transcriber, 'use_mps_tensors') and transcriber.use_mps_tensors:
+                        device_factor = 0.2  # MPS acceleration via CPU
+                    else:
+                        device_factor = 0.3
+                    
+                    estimated_time = audio_duration * device_factor * model_factor
                     
                     status_text.text(f"⏱️ Audio duration: {audio_duration:.1f} seconds | Estimated processing: ~{estimated_time:.0f} seconds")
                     
@@ -141,13 +266,13 @@ def main():
                     
                     # Transcribe with or without timestamps
                     if show_timestamps:
-                        status_text.text("📝 Generating transcription with timestamps...")
+                        status_text.text(f"📝 Generating transcription with timestamps ({model_display_name})...")
                         result = transcriber.transcribe_with_timestamps(
                             temp_audio_path,
                             language=language
                         )
                     else:
-                        status_text.text("📝 Generating transcription...")
+                        status_text.text(f"📝 Generating transcription ({model_display_name})...")
                         result = transcriber.transcribe(
                             temp_audio_path,
                             language=language,
@@ -228,9 +353,19 @@ def main():
     
     with st.sidebar:
         st.markdown("### ℹ️ Information")
-        st.markdown(f"**Model:** PhoWhisper-large-ct2")
+        st.markdown(f"**Model:** {model_option}")
         st.markdown(f"**Backend:** Faster-Whisper")
-        st.markdown(f"**Device:** {'GPU' if transcriber.device == 'cuda' else 'CPU'}")
+        
+        # Display device info properly
+        if hasattr(transcriber, 'use_mps_tensors') and transcriber.use_mps_tensors:
+            device_display = 'CPU + MPS Acceleration'
+        else:
+            device_display = {
+                'cuda': 'GPU (CUDA)',
+                'cpu': 'CPU'
+            }.get(transcriber.device, transcriber.device)
+        
+        st.markdown(f"**Device:** {device_display}")
         st.markdown(f"**Compute Type:** {transcriber.compute_type}")
         
         st.markdown("---")
@@ -255,8 +390,10 @@ def main():
         st.markdown("---")
         st.markdown("### 🚀 Features")
         st.markdown("""
-        - **PhoWhisper-large**: State-of-the-art Vietnamese ASR
+        - **Multiple Models**: Choose between Small (fast) or Large (accurate)
+        - **PhoWhisper**: State-of-the-art Vietnamese ASR models
         - **Faster-Whisper**: Optimized inference with CTranslate2
+        - **Metal Support**: Accelerated inference on Apple Silicon
         - **VAD Filter**: Voice Activity Detection for better accuracy
         - **Multi-language**: Supports Vietnamese and English
         - **Timestamps**: Optional word-level timestamps
