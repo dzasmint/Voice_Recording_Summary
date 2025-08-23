@@ -109,7 +109,8 @@ class FasterWhisperTranscriber:
             raise
     
     def transcribe(self, audio_path, language="vi", task="transcribe", 
-                  beam_size=5, best_of=5, temperature=0, progress_callback=None):
+                  beam_size=5, best_of=5, temperature=0, progress_callback=None,
+                  vad_filter=True, vad_parameters=None):
         """
         Transcribe audio file to text using Faster-Whisper
         
@@ -121,11 +122,21 @@ class FasterWhisperTranscriber:
             best_of: Number of candidates when sampling
             temperature: Temperature for sampling
             progress_callback: Optional callback function for progress updates
+            vad_filter: Enable voice activity detection filter
+            vad_parameters: Optional VAD parameters dictionary
         
         Returns:
             Dictionary with transcription results
         """
         try:
+            # Set default VAD parameters if not provided
+            if vad_parameters is None:
+                vad_parameters = dict(
+                    min_silence_duration_ms=500,
+                    speech_pad_ms=400,
+                    threshold=0.5
+                )
+            
             segments, info = self.model.transcribe(
                 audio_path,
                 language=language,
@@ -133,12 +144,8 @@ class FasterWhisperTranscriber:
                 beam_size=beam_size,
                 best_of=best_of,
                 temperature=temperature,
-                vad_filter=True,
-                vad_parameters=dict(
-                    min_silence_duration_ms=500,
-                    speech_pad_ms=400,
-                    threshold=0.5
-                )
+                vad_filter=vad_filter,
+                vad_parameters=vad_parameters
             )
             
             # Combine all segments into full text
