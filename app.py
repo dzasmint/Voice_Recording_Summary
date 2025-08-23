@@ -53,13 +53,14 @@ def main():
         st.markdown("#### 🤖 Model Selection")
         model_option = st.selectbox(
             "Choose Model",
-            ["PhoWhisper-small", "PhoWhisper-large-ct2"],
+            ["PhoWhisper-small", "PhoWhisper-medium", "PhoWhisper-large-ct2"],
             index=0,  # Default to small model
             format_func=lambda x: {
                 "PhoWhisper-small": "Small (Fast, 39M params)",
+                "PhoWhisper-medium": "Medium (Balanced, 769M params)",
                 "PhoWhisper-large-ct2": "Large (Accurate, 1.5B params)"
             }[x],
-            help="Small model is 5-10x faster with good accuracy. Large model has highest accuracy but slower."
+            help="Small: 5-10x faster with good accuracy. Medium: Balanced speed and accuracy. Large: Highest accuracy but slower."
         )
         
         # Show model details
@@ -239,7 +240,11 @@ def main():
                     
                     # Step 3: Start transcription
                     progress_bar.progress(40, text="Starting transcription...")
-                    model_display_name = "PhoWhisper-small" if model_option == "PhoWhisper-small" else "PhoWhisper-large"
+                    model_display_name = {
+                        "PhoWhisper-small": "PhoWhisper-small",
+                        "PhoWhisper-medium": "PhoWhisper-medium",
+                        "PhoWhisper-large-ct2": "PhoWhisper-large"
+                    }.get(model_option, model_option)
                     status_text.text(f"🎯 Processing audio with {model_display_name}...")
                     
                     # Get audio duration for progress estimation
@@ -247,8 +252,13 @@ def main():
                     audio_duration = librosa.get_duration(path=temp_audio_path)
                     
                     # Estimate processing time based on device and model
-                    # Small model is 5-10x faster than large model
-                    model_factor = 0.2 if model_option == "PhoWhisper-small" else 1.0
+                    # Model speed factors: Small is fastest, medium is balanced, large is slowest
+                    model_factors = {
+                        "PhoWhisper-small": 0.2,
+                        "PhoWhisper-medium": 0.5,
+                        "PhoWhisper-large-ct2": 1.0
+                    }
+                    model_factor = model_factors.get(model_option, 1.0)
                     
                     if transcriber.device == "cuda":
                         device_factor = 0.1
@@ -390,7 +400,7 @@ def main():
         st.markdown("---")
         st.markdown("### 🚀 Features")
         st.markdown("""
-        - **Multiple Models**: Choose between Small (fast) or Large (accurate)
+        - **Multiple Models**: Choose between Small (fast), Medium (balanced), or Large (accurate)
         - **PhoWhisper**: State-of-the-art Vietnamese ASR models
         - **Faster-Whisper**: Optimized inference with CTranslate2
         - **Metal Support**: Accelerated inference on Apple Silicon

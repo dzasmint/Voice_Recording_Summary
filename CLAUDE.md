@@ -28,12 +28,18 @@ python -m flake8 .
 The application now supports multiple PhoWhisper models:
 
 1. **PhoWhisper-small** (Default)
-   - Repository: qbsmlabs/PhoWhisper-small
+   - Repository: quocphu/PhoWhisper-ct2-FasterWhisper (small model)
    - Size: 39M parameters
-   - Performance: 5-10x faster than large model
+   - Performance: 5-10x faster than large model, CTranslate2 optimized
    - Best for: Real-time transcription, low-resource devices
 
-2. **PhoWhisper-large-ct2**
+2. **PhoWhisper-medium**
+   - Repository: quocphu/PhoWhisper-ct2-FasterWhisper (medium model)
+   - Size: 769M parameters
+   - Performance: Better accuracy than small, 2-3x faster than large, CTranslate2 optimized
+   - Best for: Balanced performance, general-purpose transcription
+
+3. **PhoWhisper-large-ct2**
    - Repository: kiendt/PhoWhisper-large-ct2
    - Size: 1.5B parameters
    - Performance: Highest accuracy, slower inference
@@ -57,7 +63,7 @@ The application consists of several main modules:
 
 ## Key Implementation Details
 
-- **Models**: Supports both PhoWhisper-small (default, fast) and PhoWhisper-large-ct2 (accurate)
+- **Models**: Supports PhoWhisper-small (fast), PhoWhisper-medium (balanced), and PhoWhisper-large-ct2 (accurate)
 - **Model Selection**: Users can choose models via sidebar dropdown
 - **Device Selection**: Automatically uses CUDA if available, falls back to CPU with optimized compute types
 - **Audio Processing**: Handles multiple formats (WAV, MP3, M4A, AAC, OGG) with format detection

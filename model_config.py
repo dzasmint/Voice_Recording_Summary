@@ -2,11 +2,25 @@
 
 AVAILABLE_MODELS = {
     "PhoWhisper-small": {
-        "repo_id": "qbsmlabs/PhoWhisper-small",
-        "description": "Small model - Faster inference, lower resource usage",
+        "repo_id": "quocphu/PhoWhisper-ct2-FasterWhisper",
+        "subfolder": "PhoWhisper-small-ct2-fasterWhisper",
+        "description": "Small model - Faster inference, lower resource usage (CTranslate2 optimized)",
         "size": "39M parameters",
         "performance": "Good accuracy, 5-10x faster than large",
         "recommended_for": "Real-time transcription, low-resource devices",
+        "compute_type": {
+            "cuda": "float16",
+            "mps": "float32",
+            "cpu": "int8"
+        }
+    },
+    "PhoWhisper-medium": {
+        "repo_id": "quocphu/PhoWhisper-ct2-FasterWhisper",
+        "subfolder": "PhoWhisper-medium-ct2-fasterWhisper",
+        "description": "Medium model - Balanced accuracy and speed (CTranslate2 optimized)",
+        "size": "769M parameters",
+        "performance": "Better accuracy than small, 2-3x faster than large",
+        "recommended_for": "Balanced performance, general-purpose transcription",
         "compute_type": {
             "cuda": "float16",
             "mps": "float32",

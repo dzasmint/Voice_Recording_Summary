@@ -18,7 +18,8 @@ class FasterWhisperTranscriber:
         # Get model configuration
         self.model_name = model_name
         model_info = get_model_info(model_name)
-        self.model_size = model_info["repo_id"]
+        self.model_repo = model_info["repo_id"]
+        self.subfolder = model_info.get("subfolder", None)
         self.requested_device = device  # Store the originally requested device
         
         if device == "auto":
@@ -59,7 +60,10 @@ class FasterWhisperTranscriber:
     def _load_model(self):
         """Load the Faster-Whisper model"""
         try:
-            print(f"Loading Faster-Whisper model: {self.model_size}")
+            if self.subfolder:
+                print(f"Loading Faster-Whisper model: {self.model_repo}/{self.subfolder}")
+            else:
+                print(f"Loading Faster-Whisper model: {self.model_repo}")
             print(f"Device: {self.device}, Compute type: {self.compute_type}")
             
             if hasattr(self, 'use_mps_tensors') and self.use_mps_tensors:
@@ -73,8 +77,26 @@ class FasterWhisperTranscriber:
                 if platform.processor() == 'arm':
                     cpu_threads = 8  # Typical number of performance cores on M1/M2
             
+            # Build model path
+            if self.subfolder:
+                # For models with subfolders, construct the full path
+                import os
+                cache_dir = os.path.expanduser("~/.cache/faster-whisper")
+                # Download the model first if needed
+                from huggingface_hub import snapshot_download
+                model_path = snapshot_download(
+                    repo_id=self.model_repo,
+                    cache_dir=cache_dir,
+                    allow_patterns=[f"{self.subfolder}/*"]
+                )
+                model_path = os.path.join(model_path, self.subfolder)
+            else:
+                # For models without subfolders, use repo_id directly
+                model_path = self.model_repo
+            
+            # Load the model
             self.model = WhisperModel(
-                self.model_size,
+                model_path,
                 device=self.device,
                 compute_type=self.compute_type,
                 download_root=os.path.expanduser("~/.cache/faster-whisper"),
